@@ -5,8 +5,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @RestController
 @RequestMapping("/api/v1/warehouse")
 public class WarehouseController {
@@ -15,13 +13,13 @@ public class WarehouseController {
     private WarehouseClientService warehouseClientService;
 
     /**
-     * Endpoint kiểm tra tồn kho từ kho tổng (warehouse-service).
-     * Ví dụ: GET http://localhost:8081/api/v1/warehouse/check-stock?medicineCode=PANADOL
+     * Endpoint kiểm tra tồn kho.
+     * GET http://localhost:8081/api/v1/warehouse/check-stock?medicineCode=PANADOL
      */
     @GetMapping("/check-stock")
-    public ResponseEntity<Map<String, Object>> checkStock(
+    public ResponseEntity<String> checkStock(
             @RequestParam(defaultValue = "PANADOL") String medicineCode) {
-        Map<String, Object> result = warehouseClientService.checkStock(medicineCode);
+        String result = warehouseClientService.checkWarehouse(medicineCode);
         return ResponseEntity.ok(result);
     }
 }
