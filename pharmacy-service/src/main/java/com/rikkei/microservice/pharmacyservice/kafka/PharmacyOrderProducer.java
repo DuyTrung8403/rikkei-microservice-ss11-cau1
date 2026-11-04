@@ -25,9 +25,9 @@ public class PharmacyOrderProducer {
      * Các đơn hàng của cùng một loại thuốc luôn đi vào cùng một Partition!
      */
     public CompletableFuture<SendResult<String, Object>> sendOrderEvent(OrderEvent orderEvent) {
-        String key = orderEvent.getMedicineId();
-        log.info(">> [KAFKA PRODUCER] Đang gửi OrderEvent: topic='{}', key (medicineId)='{}', orderId='{}'",
-                TOPIC, key, orderEvent.getOrderId());
+        String key = String.valueOf(orderEvent.getMedicineId());
+        log.info(">> [KAFKA PRODUCER] Đang gửi OrderEvent: topic='{}', key (medicineId)='{}', orderId='{}', quantity={}",
+                TOPIC, key, orderEvent.getOrderId(), orderEvent.getQuantity());
 
         return kafkaTemplate.send(TOPIC, key, orderEvent)
                 .whenComplete((result, ex) -> {

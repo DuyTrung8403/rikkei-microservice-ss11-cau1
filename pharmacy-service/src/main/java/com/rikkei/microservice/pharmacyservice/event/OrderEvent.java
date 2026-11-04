@@ -14,8 +14,10 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class OrderEvent {
     private String orderId;
-    private String medicineId;
-    private int quantity;
+    private Long medicineId;
+    private Integer quantity;
+    private Double priceSell;
+    private Double totalAmount;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime timestamp;

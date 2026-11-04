@@ -77,11 +77,21 @@ public class BillController {
 
         String orderId = "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
 
+        Long medId = 1L;
+        try {
+            if (request.getMedicineId() != null) {
+                medId = Long.parseLong(request.getMedicineId().replaceAll("[^0-9]", ""));
+            }
+        } catch (Exception ignored) {
+        }
+
         // 1. Tạo đối tượng OrderEvent theo yêu cầu: orderId, medicineId, quantity, timestamp
         OrderEvent orderEvent = OrderEvent.builder()
                 .orderId(orderId)
-                .medicineId(medicineId)
+                .medicineId(medId)
                 .quantity(quantity)
+                .priceSell(price)
+                .totalAmount(totalAmount)
                 .timestamp(LocalDateTime.now())
                 .build();
 
