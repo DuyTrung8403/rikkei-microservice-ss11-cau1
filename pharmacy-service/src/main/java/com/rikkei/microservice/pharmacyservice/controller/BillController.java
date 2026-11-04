@@ -1,12 +1,18 @@
 package com.rikkei.microservice.pharmacyservice.controller;
 
+import com.rikkei.microservice.pharmacyservice.dto.CheckoutRequest;
+import com.rikkei.microservice.pharmacyservice.event.OrderEvent;
+import com.rikkei.microservice.pharmacyservice.kafka.PharmacyOrderProducer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/bill")
@@ -16,6 +22,12 @@ public class BillController {
     @Value("${pharmacy.vat-rate:0.08}")
     private double vatRate;
 
+    @Autowired
+    private PharmacyOrderProducer orderProducer;
+
+    /**
+     * API 1: Tính tiền hóa đơn thuốc (Dùng cho bài RefreshScope trước)
+     */
     @PostMapping
     public ResponseEntity<?> calculateBill(@RequestBody Map<String, Double> request) {
         Double totalMedicinePrice = request.get("totalMedicinePrice");
@@ -33,7 +45,6 @@ public class BillController {
             ));
         }
 
-        // Tỷ lệ thuế: hỗ trợ cả dạng thập phân (0.08) và phần trăm (8 hoặc 10)
         double rate = vatRate >= 1 ? vatRate / 100.0 : vatRate;
         double vatAmount = totalMedicinePrice * rate;
         double totalBill = totalMedicinePrice + vatAmount;
@@ -46,5 +57,51 @@ public class BillController {
         result.put("message", "Tính tiền hóa đơn thuốc thành công");
 
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * API 2: Thanh toán đơn thuốc và gửi sự kiện OrderEvent lên Kafka Broker (Topic: medicine-stock-events)
+     * Thử thách: Key của message là medicineId để cùng loại thuốc luôn vào cùng 1 Partition.
+     */
+    @PostMapping("/checkout")
+    public ResponseEntity<?> checkout(@RequestBody CheckoutRequest request) {
+        String medicineId = request.getMedicineId() != null ? request.getMedicineId() : "MED-" + UUID.randomUUID().toString().substring(0, 5);
+        int quantity = request.getQuantity() != null && request.getQuantity() > 0 ? request.getQuantity() : 1;
+        double price = request.getPrice() != null && request.getPrice() > 0 ? request.getPrice() : 50000.0;
+
+        // Tính tiền thuốc kèm VAT
+        double subtotal = price * quantity;
+        double rate = vatRate >= 1 ? vatRate / 100.0 : vatRate;
+        double vatAmount = subtotal * rate;
+        double totalAmount = subtotal + vatAmount;
+
+        String orderId = "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+        // 1. Tạo đối tượng OrderEvent theo yêu cầu: orderId, medicineId, quantity, timestamp
+        OrderEvent orderEvent = OrderEvent.builder()
+                .orderId(orderId)
+                .medicineId(medicineId)
+                .quantity(quantity)
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        // 2. Gửi sự kiện lên Kafka Broker (Message Key = medicineId)
+        orderProducer.sendOrderEvent(orderEvent);
+
+        // 3. Phản hồi thông tin thanh toán thành công
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("status", "SUCCESS");
+        response.put("message", "Thanh toán thành công! Sự kiện đơn hàng đã được gửi lên Kafka Broker.");
+        response.put("orderId", orderId);
+        response.put("medicineId", medicineId);
+        response.put("quantity", quantity);
+        response.put("subtotal", subtotal);
+        response.put("vatAmount", vatAmount);
+        response.put("totalPayment", totalAmount);
+        response.put("kafkaTopic", PharmacyOrderProducer.TOPIC);
+        response.put("kafkaMessageKey", medicineId);
+        response.put("partitionGuarantee", "Các đơn hàng cùng medicineId '" + medicineId + "' luôn vào cùng 1 Partition!");
+
+        return ResponseEntity.ok(response);
     }
 }
