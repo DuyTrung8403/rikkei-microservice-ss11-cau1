@@ -27,6 +27,15 @@ services:
     networks:
       - kafka-net
 
+  redis:
+    image: redis:alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - kafka-net
+
 networks:
   kafka-net:
     driver: bridge
